@@ -18,10 +18,10 @@ jobs:
       - name: Wait 10 minutes
         run: sleep 600
         
-      # - name: 1. Checkout Repository
-      #   uses: actions/checkout@v6
-      #   with:
-      #     persist-credentials: false
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: 2. Setup OpenSSH Server & Set Runner Password
         run: |
           sudo apt-get update
@@ -372,16 +372,16 @@ jobs:
           H=/home/runner/.hermes
           HDEST=hermes
 
-          # # 1. Copy all dynamic hermes dirs & files back to repo
-          # mkdir -p "$HDEST"
-          # for item in memories skills cron hooks platforms sessions kanban; do
-          #   [ -d "$H/$item" ] && cp -r "$H/$item" "$HDEST/"
-          # done
-          # for f in SOUL.md kanban.db state.db channel_directory.json \
-          #          gateway_state.json .skills_prompt_snapshot.json; do
-          #   [ -f "$H/$f" ] && cp "$H/$f" "$HDEST/"
-          # done
-          # echo '✅ Copied hermes dynamic state → hermes/ for backup'
+          # 1. Copy all dynamic hermes dirs & files back to repo
+          mkdir -p "$HDEST"
+          for item in memories skills cron hooks platforms sessions kanban; do
+            [ -d "$H/$item" ] && cp -r "$H/$item" "$HDEST/"
+          done
+          for f in SOUL.md kanban.db state.db channel_directory.json \
+                   gateway_state.json .skills_prompt_snapshot.json; do
+            [ -f "$H/$f" ] && cp "$H/$f" "$HDEST/"
+          done
+          echo '✅ Copied hermes dynamic state → hermes/ for backup'
 
           # 2. Copy 9router database back to repo
           mkdir -p 9router
