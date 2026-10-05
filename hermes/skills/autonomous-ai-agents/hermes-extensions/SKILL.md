@@ -22,8 +22,6 @@ metadata:
 
 The user asks every session to confirm these integrations are live and to fix any that are broken, so this class of task recurs. "Installed" is unproven until a runtime check passes — a name in config is not an install record.
 
-## Step 1 — Verify before installing anything
-
 Never read install state from `config.yaml`. `plugins.enabled` is a *selection* list, not an install record: it can name a plugin whose directory was never fetched, and that plugin then silently does nothing.
 
 ```bash
@@ -67,11 +65,22 @@ skills_list                            # plugin skills present, category "plugin
 
 Plus: install output must report the gateway reloaded and registered hooks. Any one of these missing means not working — say so, do not summarize as installed.
 
+## Step 6 — Remove / "is it even there?" audit
+
+Removal and "does this exist at all" are the same sweep — an audit must cover every surface where an integration can hide, or it reports a false clean. Work the probe list in `references/extension-removal-audit.md` (plugins dir + CLI, `config.yaml` platform/toolset blocks, `.env` and process env, cron jobs, skills, memories, kanban, vault, and the SQLite row counts).
+
+Report the audit as evidence per surface, then state the one honest conclusion ("nothing installed, nothing to remove") rather than performing a deletion for show.
+
+**A reference to the extension inside upstream core code is not an install.** `~/.hermes/hermes-agent` is a clean git checkout of upstream: catalog entries (`plugin-catalog/<name>.yaml`), migration shims, metrics allowlists, and docs all mention extensions nobody installed. Never patch or delete those to satisfy a "remove it" request — it forks the repo and `hermes update` overwrites it. Say so explicitly and offer the real alternative (block future install, or leave it).
+
 ## Pitfalls
 
 - **`hermes skills list` does not list plugin-provided skills.** Only the `skills_list` tool does, under category `plugin`. Grepping CLI output for a plugin's skills is a false negative; never conclude the install failed from it.
 - **Plugin skills need the qualified name**: `skill_view(name="<plugin>:<skill>")`. The bare name will not resolve.
 - **Catalog misses are normal.** `hermes plugins search` / `browse` cover only the curated catalog, so an unreviewed GitHub plugin never appears there. Absence from search is not evidence of nonexistence — check disk.
+- **`hermes plugins show <name>` returning "not found" proves nothing about the catalog.** It resolves installed plugins only, so a name present in `plugin-catalog/` will always miss. Use it to confirm absence of an *install*, never to claim the extension does not exist.
+- **Exclude `~/.hermes/hermes-agent/` and `~/.hermes/installs/` from greps.** Those are upstream source and staged build copies; a naive recursive grep matches dozens of files for any popular extension and buries the real signal. Filter them, then read what remains.
+- **Never pass `--force` on an install the user did not ask for.** A "remove it" or "is it there" request is an audit, not authorization to re-clone and enable it.
 - **A long session can silently lose a plugin bootstrap.** Hermes has no post-compaction hook: a session that compacts over its first turn drops the injected bootstrap and the skills stop triggering. Symptom = "skills stopped applying mid-conversation"; fix = start a fresh session, never a reinstall.
 - **Reinstall only when the entrypoint is broken.** Refresh an installed plugin with `hermes plugins update <name>`; re-running `install` re-clones and churns the tree.
 
