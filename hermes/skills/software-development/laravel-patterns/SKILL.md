@@ -125,6 +125,73 @@ $row->forceFill(['created_at' => $day, 'updated_at' => $day])->save();
 
 Give time-window fixtures a **midday** timestamp. The app timezone and the database session timezone often differ, and `date(column)` buckets in the *session* zone — a midnight value can fall in the previous day and shift the whole window.
 
+## Seeders & Seed Data
+
+### A seeder that silently skips a record hides a broken key, not a missing row
+
+A seeder looking a row up by an application-level key (national code, external id, slug) that
+is absent from the parent data file produces NO error — it just does not insert. The run reports
+`DONE`, the exit code is 0, and the gap only shows up as a missing feature's history later.
+A skip counter in the output is the ONLY evidence, so read the seeder's own informational lines
+(`tail` the full output, not just the last `DONE` line) before calling a seed successful.
+
+**Rule:** when a seed reports skipped/missing entries, do not accept "device not seeded, skip
+silently" — resolve each skipped key against the table the parent seeder writes and fix the
+DATA FILE, not the seeder's skip branch. Grep the offending key across the whole repo: if it
+appears in exactly one file and nowhere else, that file is the bug.
+
+Cross-file key agreement is worth asserting wholesale, not per-case: extract every key from the
+child data file with its human-readable label, join against the parent's table, and list the
+mismatches. Per-case hunting is O(failures); the join is one pass and also catches keys that
+resolve to the WRONG row (same count, silently wrong history attached to a different device).
+
+```php
+// one pass: label in the comment above the key vs. the parent's pc_name
+foreach ($lines as $line) {
+    if (preg_match('~//\s*──\s*([A-Z0-9-]+)~u', $line, $m)) { $label = $m[1]; continue; }
+    if ($label !== null && preg_match("~^\\s*'(\d{10})'\s*=>~", $line, $m)) {
+        $hw = DB::table('hardwares')->where('n_code', $m[1])->first();
+        echo ($hw && $hw->pc_name === $label) ? 'ok' : "MISMATCH: {$label} -> ".($hw->pc_name ?? 'MISSING');
+        $label = null;
+    }
+}
+```
+
+Label + key pairs in a data file make a self-checking fixture: the comment names the device, the
+key resolves to it, so drift in either is visible without opening the parent data file.
+
+**Rule:** after fixing seed data, prove the fix two ways — re-run the seeder and confirm the
+skip is gone, then re-run it AGAIN and confirm `0 new` (idempotency guard still works, so the
+change did not weaken the duplicate protection), and read back the affected rows to confirm the
+history actually attached to the intended record.
+
+### `migrate:fresh --seed` needs a dump before it runs, and its output hides the interesting part
+
+`--fresh` drops every table. Take a `pg_dump -Fc` first; it is cheap insurance and the only way
+back if the seed turns out to be lossy. Also snapshot per-table row counts BEFORE, and diff them
+after — equal counts across the board is the evidence that seeders rebuilt the reference data
+rather than leaving hand-made rows, and a table that came back with a different count tells you
+which seeder is non-deterministic (or that some table is not seeded at all).
+
+```bash
+export PGPASSWORD="$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d \"'\")"
+pg_dump -h 127.0.0.1 -U h_dashboard -d h_dashboard -Fc -f .hermes-backups/db-$(date +%Y%m%d-%H%M%S).dump
+```
+
+Snapshot counts with a single `DB::select()` over `pg_tables` rather than one query per table.
+Put dump files somewhere gitignored, or they show up as untracked noise on the next `git status`.
+
+**Rule:** a seed run is verified when every seeder reports DONE, the PostGIS/extension versions
+still resolve, and the post-seed counts match the pre-seed snapshot. Anything else is a partial
+success that reads exactly like a full one.
+
+### A deterministic back-dated seeder must key on a value that exists
+
+Seeder fixtures that back-date rows need a fixed base date (so re-runs are byte-identical) and a
+key that resolves. When both halves come from a human-edited data file they drift apart silently.
+Keep the base date a class property, not a literal spread across entries, and keep every key in
+the data file cross-checked against the table the parent seeder writes.
+
 ## Feature Parity Across Egress Paths
 
 ### A new column must reach every path a user reads or re-enters data through
@@ -281,3 +348,16 @@ This is separate from `config:clear` and `route:clear`.
 - After cache batching changes: run the full test suite — dedup bugs silently pass unit tests but break feature tests that assert exact version counts.
 - After removing event listeners: always `event:clear` before running tests.
 - After model event changes: test both create and update paths — they exercise different code paths in `saved` callbacks.
+- After editing seed data or a seeder: read the seeder's informational lines, not just its `DONE` line — a silent skip is reported there and nowhere else.
+
+### Run Pint through the PHP binary when the shell wrapper is refused
+
+`vendor/bin/pint` ships as a compiled PHAR. Terminal gateways that scan every executed script
+before running it can refuse the wrapper because the binary exceeds the scan size cap — the
+refusal names the file, not the real problem, so it reads like Pint is broken.
+
+**Rule:** when a tool's launcher wrapper is rejected as unscannable, invoke the same tool
+through its interpreter rather than working around it or skipping the check:
+`php vendor/bin/pint --test` runs the identical binary and returns its result. Never report
+formatting as "could not run" without trying the interpreter form first — CI enforces Pint, so
+an unverified format is an unverifiable commit.

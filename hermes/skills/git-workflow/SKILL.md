@@ -115,7 +115,70 @@ Verify each criticism against the code before accepting or defending it. Reviewe
 gh pr view <n> --repo <owner>/<repo> --json reviewDecision,reviews
 ```
 
+**An empty inline-comment list is not an empty review.** Review comments attached to
+specific lines and block-level review bodies are separate endpoints, and the request
+usually lives in the bodies. Query both before concluding there is no feedback:
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<n>/comments   # inline, per-line
+gh api repos/<owner>/<repo>/pulls/<n>/reviews    # block-level, carries the verdict
+```
+
+Read the `state` field (`CHANGES_REQUESTED` / `APPROVED` / `COMMENTED`) — it tells you
+whether anything blocks a merge.
+
 For a docs/claims review, every accepted finding should be re-derived from the source, not patched from the reviewer's wording — and state in the reply which claims you confirmed. If a finding's stated *cause* is wrong but its *symptom* is real, fix the symptom and report the real cause separately rather than adopting the wrong explanation.
+
+### Removing an unrelated file from an open PR
+
+When the complaint is "this file does not belong in this PR" — a planning doc, a
+generated artifact, another issue's work — cut it on the same branch rather than
+cherry-picking onto a topic branch. Cherry-pick is the right move only when the branch
+is free to be replaced; if the branch is published and long-lived, a fresh topic branch
+contradicts the project's one-branch-per-server rule and loses nothing by not doing it.
+
+```bash
+cp <file> ~/some-backup-dir/          # preserve content outside the tree FIRST
+git rm <file>
+git diff --stat <base>..HEAD           # scope check: only the intended change left
+git commit -m "docs: drop <file> from the branch"
+git push origin HEAD:refs/heads/<branch>
+```
+
+The `cp` comes first — after `git rm` the content is only in git history, and the point
+of removing it is that you do not want it in history either. Use the explicit
+`HEAD:refs/heads/<branch>` refspec so a branch whose tracking config points at another
+branch still delivers (see *Dirty Startup and Tracking Checks*).
+
+Then verify the PR diff is exactly the change you claim:
+
+```bash
+git diff --stat <base>..HEAD
+gh pr diff <n> --repo <owner>/<repo> --name-only
+```
+
+Reply in the PR thread and stop. Merging is always a separate, explicit request.
+
+### Posting the reply
+
+A PR conversation is an issue conversation: the write endpoint is
+`issues/<n>/comments` and it takes `issue_number`, even when the target is a PR.
+Handing `pull_number` to an issue-comment call is rejected on argument validation —
+that is an endpoint mix-up, not a permissions problem. `pulls/<n>/comments` is the
+READ side and stays read-only; never write a reply there.
+
+```bash
+gh api repos/<owner>/<repo>/issues/<n>/comments -f body="$(cat /tmp/reply.md)"
+```
+
+Write long replies to a file and pass `body="$(cat ...)"` — inline `-f body='...'`
+breaks on backticks, quotes, and newlines inside shell quoting, and the mangled text
+lands in a thread a human will read.
+
+MCP GitHub tools and the `gh` CLI use different tokens, so an MCP call can fail
+authentication while `gh` is still authenticated. Fall back to `gh api` for the
+write, confirm it returned a comment `html_url`, and report that URL — a bare exit 0
+from the CLI does not prove the comment posted.
 
 ## Pitfalls
 
