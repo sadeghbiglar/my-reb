@@ -87,3 +87,17 @@ Report the audit as evidence per surface, then state the one honest conclusion (
 ## superpowers (obra/superpowers)
 
 Installed at `~/.hermes/plugins/superpowers`, exposes ~15 skills as `superpowers:<name>`. Process skills come first and gate the rest: `brainstorming` before any plan or new feature, `systematic-debugging` before any bug fix, `writing-plans` → `executing-plans` / `subagent-driven-development` for implementation, `verification-before-completion` before reporting work as done. `using-superpowers` must not be re-invoked once its bootstrap is loaded.
+
+Install command, verified 2026-10-05: `hermes plugins install obra/superpowers --enable --force`.
+`--force` is required — the security scan BLOCKS with 233 findings, all of them
+"LOW persistence" hits in `*.md` docs, test fixtures, and skill prose (e.g.
+`references/hermes-tools.md` mentioning "your instructions file"). None land in the
+executable surface. Before forcing, read `.hermes-plugin/__init__.py`: it is pure —
+`register_skill()` loops the `skills/` tree and a `pre_llm_call` hook returns the
+bootstrap string on the first turn; no network, subprocess, or credential access
+(verify with a grep for `requests|urllib|socket|subprocess|os.system|popen|curl|wget|token|api_key|password|.env`).
+Benign install warnings to ignore: `custom (unreviewed) source`,
+`Skipped Node deps`, and `doesn't contain plugin.yaml, plugin.json, or __init__.py`
+(the manifest lives in `.hermes-plugin/`). Success signal is
+`Gateway reloaded plugins ... active in the running gateway now: hooks` plus
+`hermes plugins doctor superpowers` reporting 1 hook.

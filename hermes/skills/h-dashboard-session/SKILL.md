@@ -71,10 +71,17 @@ When the user says `pr`, open a PR from the current branch to `beta` of
 `https://github.com/asgarimehdi/h-dashboard` via GitHub MCP. **Do not merge** unless asked.
 
 ## 8. Superpowers skills are mandatory
-`superpowers` plugin is enabled (15 skills). Load the process skill before acting:
+`superpowers` plugin installed at `~/.hermes/plugins/superpowers` (v6.4.2, 15 skills,
+source `obra/superpowers`, installed with `--force` after manual entrypoint review on
+2026-10-05). Load the process skill before acting:
 brainstorming before plan mode, systematic-debugging for bugs, test-driven-development
 before writing behavior, verification-before-completion before claiming done.
 Invoke as `skill_view("superpowers:brainstorming")` etc.
+
+The `using-superpowers` bootstrap is injected only on the **first turn** of a session
+(`pre_llm_call` hook, `is_first_turn`). A session that compacted over its first turn
+lost it — that is the known failure mode, not a broken install. `AGENTS.md` above
+repeats the load-bearing rules so they survive compaction.
 
 ## 9. Docs and audit skills
 - `read-the-damn-docs` (software-development/read-the-damn-docs) — read official/current

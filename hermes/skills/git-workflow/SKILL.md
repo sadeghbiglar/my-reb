@@ -83,6 +83,66 @@ Three responses, in order of preference:
 
 **Do not `git rebase` onto the divergent remote to "fix" a non-fast-forward.** If the local branch carries many upstream commits, the rebase replays all of them and conflicts on whichever doc or lockfile those commits touched. `git rebase --abort` restores state exactly; the branch you started from is still there.
 
+## Making A Branch Exactly Match A Canonical Branch
+
+The request is "make my local branch identical to upstream X, delete any extra files". Do it as a
+four-step audit, not a blind reset — a blind `reset --hard` discards committed work the user may
+still want, and a blind `clean -fd` deletes the toolchain the working tree depends on.
+
+```bash
+git fetch https://github.com/<owner>/<repo>.git <canonical>:refs/remotes/canonical/<canonical>
+git rev-parse refs/remotes/canonical/<canonical>   # target SHA
+git diff --stat refs/remotes/canonical/<canonical> # tracked drift: local edits + missing files
+git ls-files --others --exclude-standard           # untracked extras to delete (count first)
+```
+
+Restore drifted tracked files from the canonical ref without touching history — this keeps local
+commits and only reverts the working-tree difference:
+
+```bash
+git checkout refs/remotes/canonical/<canonical> -- <path>
+```
+
+Then decide whether force is even needed. Users ask for force because they assume divergence:
+
+```bash
+git merge-base --is-ancestor <remote-branch-sha> refs/remotes/canonical/<canonical> \
+  && echo "fast-forward: no force needed" || echo "diverged: force required"
+```
+
+Push with an **explicit** lease. Plain `--force-with-lease` derives its expectation from the
+upstream tracking config, which on a managed branch may point at a different branch and then
+silently degenerates to an unconditional force:
+
+```bash
+git push --force-with-lease=refs/heads/<branch>:<expected-remote-sha> \
+  origin HEAD:refs/heads/<branch>
+```
+
+Verify by comparing **tree** hashes, not commit SHAs and not a human-read diff — tree equality is
+the actual claim "these are identical files":
+
+```bash
+git rev-parse refs/remotes/<fork>/<branch>^{tree} refs/remotes/canonical/<canonical>^{tree}
+git ls-remote --heads <fork> <branch>          # what the remote really holds now
+```
+
+Pitfalls:
+
+- **Ignored files are not extra files.** `vendor/`, `node_modules/`, `.env`, build caches and
+  tool databases are untracked *by design* and regenerable only at real cost. Delete untracked
+  extras the user actually named; report ignored leftovers, never `clean -xfd` them.
+- **Lockfile drift is normal, not a stray edit.** Package managers rewrite `package-lock.json`
+  (or its equivalent) on any install, so the working tree drifts from the branch after routine
+  commands. That drift is exactly what this audit is for — restore it and say so.
+- **`git fetch <remote> <branch>` does not create a remote-tracking ref** for a branch that remote
+  has never tracked locally; it writes `FETCH_HEAD`, so a later `refs/remotes/<remote>/<branch>`
+  lookup fails as an ambiguous argument. Use a bare `git fetch <remote>` to populate tracking refs,
+  or compare `FETCH_HEAD` directly.
+- **A fast-forward result means no rewrite happened.** When the ancestor check says fast-forward,
+  say so explicitly — reporting "force pushed" when the push advanced the ref by one commit
+  misleads the user about whether history was rewritten.
+
 ## Is A Commit Actually On The Base Branch?
 
 `git log <base>` showing a commit, or a commit sitting in your branch's history, does **not** mean the base branch contains it. A commit can reach your branch through a merge from a fork while the base took a different route.
