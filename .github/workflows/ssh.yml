@@ -14,8 +14,8 @@ jobs:
       WF_NAME: rebecca
 
     steps:
-      - name: Wait 10 minutes
-        run: sleep 600
+      # - name: Wait 10 minutes
+      #   run: sleep 600
         
       - name: 1. Checkout Repository
         uses: actions/checkout@v6
