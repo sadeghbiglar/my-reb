@@ -1,10 +1,9 @@
 name: rebecca
 
 on:
+  schedule:
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-  push:
-    branches:
-      - rebecca
 
 jobs:
   build:
