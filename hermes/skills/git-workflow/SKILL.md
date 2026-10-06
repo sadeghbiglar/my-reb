@@ -134,7 +134,10 @@ Pitfalls:
   extras the user actually named; report ignored leftovers, never `clean -xfd` them.
 - **Lockfile drift is normal, not a stray edit.** Package managers rewrite `package-lock.json`
   (or its equivalent) on any install, so the working tree drifts from the branch after routine
-  commands. That drift is exactly what this audit is for — restore it and say so.
+  commands. That drift is exactly what this audit is for — restore it and say so. Before
+  discarding it, confirm the canonical branch does not also change that file
+  (`git diff --name-only HEAD..FETCH_HEAD | grep <lockfile>`); upstream touching it makes the
+  drift a real conflict to merge, not noise to `git checkout --`.
 - **`git fetch <remote> <branch>` does not create a remote-tracking ref** for a branch that remote
   has never tracked locally; it writes `FETCH_HEAD`, so a later `refs/remotes/<remote>/<branch>`
   lookup fails as an ambiguous argument. Use a bare `git fetch <remote>` to populate tracking refs,
@@ -142,6 +145,41 @@ Pitfalls:
 - **A fast-forward result means no rewrite happened.** When the ancestor check says fast-forward,
   say so explicitly — reporting "force pushed" when the push advanced the ref by one commit
   misleads the user about whether history was rewritten.
+
+## Keeping A Fork's Base Branch Synced With A Canonical Upstream
+
+When the workflow is "am I behind the canonical `X`? mirror it into my fork, push my branch",
+a fetch of the fork's own `X` cannot answer the first question — the fork's `X` lags
+independently, so both refs are stale together and compare clean. Fetch the canonical branch
+by URL so no remote has to be added, renamed, or reconfigured:
+
+```bash
+git fetch https://github.com/<owner>/<repo>.git <canonical>     # lands in FETCH_HEAD
+git fetch <fork> --prune
+git rev-list --left-right --count FETCH_HEAD...HEAD              # <behind> <ahead>
+```
+
+Order of operations:
+
+1. Discard registry noise (lockfile bullet above) so the merge is not blocked by an
+   unrelated dirty file.
+2. Mirror canonical into the fork — `git push <fork> FETCH_HEAD:refs/heads/<canonical>`. Creates
+   the fork's branch when absent, fast-forwards it when present. Never force; if it is not a
+   fast-forward, that is real divergence to merge and resolve, not to overwrite.
+3. Bring the working branch up — `git merge --ff-only <fork>/<canonical>`. Non-fast-forward means
+   local commits on top: merge (never rebase published work).
+4. Push the working branch with an explicit refspec — `git push <fork> HEAD:refs/heads/<branch>` —
+   because `branch.<name>.merge` may point at the canonical branch and a bare `git push` then
+   writes your work to the wrong ref.
+5. Verify by SHA *and* tree hash across all three refs (canonical, fork base, fork work branch),
+   never by `git status` — a tracking config pointing at the base branch makes status read as
+   permanently ahead/behind while saying nothing about the remote work branch. The verification
+   block and the decision table live in `references/upstream-sync.md`.
+
+When the count is already `0 0` and the tree is clean, do nothing and report "already in sync" —
+an empty merge or a no-op push described as an update misleads the user about what changed. In a
+shared fork, other agents' branches are not yours to touch: sync only the base branch and your own
+branch, and list the untouched ones so the user can see they were left alone.
 
 ## Is A Commit Actually On The Base Branch?
 

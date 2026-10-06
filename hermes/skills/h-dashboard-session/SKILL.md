@@ -68,7 +68,37 @@ Clear commit message, then `git push origin <current-branch>`.
 
 ## 7. Pull requests
 When the user says `pr`, open a PR from the current branch to `beta` of
-`https://github.com/asgarimehdi/h-dashboard` via GitHub MCP. **Do not merge** unless asked.
+`https://github.com/asgarimehdi/h-dashboard`. **Do not merge** unless asked.
+
+Two tooling pitfalls, both verified 2026-10-06 (issue #818 / PR #822):
+
+- **Use `gh pr create`, not the GitHub MCP `create_pull_request`.** The MCP tool
+  silently drops the required `base` argument — the call fails twice with
+  "missing required argument(s): base" no matter how the payload is built, and
+  the body never reaches the server. `gh` works:
+  ```bash
+  gh pr create --repo asgarimehdi/h-dashboard --base beta \
+    --head Shabakebehdasht:rebecca --title "..." --body-file /tmp/pr.md
+  ```
+  Write a long body to a scratch file and pass `--body-file`; inline
+  `--body` mangles backticks and newlines.
+- **No `--maintainer-can-modify` flag** on this machine's `gh` — it errors and
+  prints usage. Omit it; the fork relationship already allows maintainer edits.
+- Watch CI with `gh run watch <run-id> --repo asgarimehdi/h-dashboard --exit-status`
+  (run id from `gh pr checks <pr> --repo asgarimehdi/h-dashboard`). `--repo` is
+  required — without it the run id does not resolve from this fork's context.
+
+### Editing a Livewire component shifts the line-keyed PHPStan baseline
+Any edit inside `resources/views/livewire/tickets/⚡*.blade.php` moves line
+numbers, so `phpstan-baseline.neon` entries stop matching and `composer phpstan`
+reports ~27 `ignore.unmatched (non-ignorable)` errors that are pure line drift.
+Fix the genuinely new errors first, then:
+```bash
+composer phpstan-baseline && composer phpstan   # must print "[OK] No errors"
+```
+Do not hand-edit the baseline, and do not assume every reported error is real —
+separate your own from the line-shift noise first (`git stash` + rerun gives the
+true pre-existing count).
 
 ## 8. Superpowers skills are mandatory
 `superpowers` plugin installed at `~/.hermes/plugins/superpowers` (v6.4.2, 15 skills,
