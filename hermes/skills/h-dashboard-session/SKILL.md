@@ -88,6 +88,70 @@ Two tooling pitfalls, both verified 2026-10-06 (issue #818 / PR #822):
   (run id from `gh pr checks <pr> --repo asgarimehdi/h-dashboard`). `--repo` is
   required — without it the run id does not resolve from this fork's context.
 
+### A Sanctum ability assertion is worthless unless the session is detached
+`Laravel\Sanctum\Guard::__invoke()` checks the `web` guard **first**. If a session
+still resolves, it returns a `TransientToken` whose `can()` is unconditionally
+true and the stored `abilities` are **never read** — so asserting "this token
+cannot POST /api/hardware" against a logged-in session yields **422 from
+validation, not 403 from the gate**. The test proves nothing.
+
+```php
+$token = Livewire::actingAs($user)->test('some.component')->get('someToken');
+$this->app['auth']->guard('web')->logout();
+$this->app['auth']->forgetGuards();
+// now the request authenticates from the Bearer token ALONE
+```
+
+This is the same artifact that made issue #840's own "token survives logout"
+measurement unreproducible. It is also the real threat model when a plaintext
+token sits in rendered HTML: whoever reads it uses it with no session of their own.
+
+Table name is **`hardwares`**, not `hardware`, for `assertDatabaseMissing`.
+
+### `#[Locked]` throws in tests; it does not return 419
+`CannotUpdateLockedPropertyException::render()` maps to a 419 response **only when
+`app.debug` is off**. The test env has debug on, so `$component->set($locked, …)`
+surfaces the exception. Assert it with `expectException`, not `assertStatus(419)`.
+`#[Locked]` is also only *defence in depth* — it stops a client swapping a
+server-written property, it does **not** remove a plaintext that is already
+rendered into the HTML.
+
+### Never run two suites at once — they share `h_dashboard_test`
+`composer test` in the background while an interactive `php artisan test` runs
+interleaves `RefreshDatabase` on the **same** database. Symptoms are misleading:
+`drop table … cascade` failures, and unrelated tests failing that pass in
+isolation. Kill the background run (`process_manage action=kill`) and re-run
+serially — the results you got before the collision mean nothing.
+
+### A test helper's override keys are often NOT fillable
+`TicketsInboxLivewireTest::createTicket()` reads `$overrides['unit']` /
+`['user']` for its defaults but then `array_merge`s them into the create
+array, where `Ticket`'s `$fillable` has only `unit_id` / `user_id`. Passing
+`'unit' => $unit` therefore lands the ticket in `Unit::first()` **silently** and
+the ticket appears to be out of the viewer's scope. Set the real columns.
+
+Two more traps in the same family:
+- `createUserWithUnit()` returns keys `user` / `unit` — destructuring
+  `['creator' => …]` throws `Undefined array key`.
+- `createUserOnUnit()` grants **no Spatie permission**, so a viewer built with
+  it cannot open a permission-gated page and the component under test never
+  runs. Also `accessibleUnitIds()` reads `session('current_unit_id')` first and
+  only falls back to the pivot, so seed it or the scope is `[]`.
+
+### `Todo::accessible()` / `Builder::accessible()` is a PHPStan error
+The scope lives on `HasOrganizationalScope`, so neither the static nor the
+`Builder` form resolves at level 6 (`undefined static method` /
+`undefined method Builder::accessible()`). Use an explicit
+`->whereIn('unit_id', app(AccessService::class)->accessibleUnitIds())` — which
+is also the form that fails closed.
+
+`$ticket->setRelation(...)` after `Ticket::query()->whereIn(...)->find(...)`
+reports `Cannot call method setRelation() on stdClass` (the known `@mixin`
+gotcha). Fix with `/** @var Ticket|null $ticket */` above the assignment — and
+**do not** switch to `$ticket->task = …`: that routes through `setAttribute()`,
+parking the model in `$attributes` where a later `save()` tries to write a
+non-existent column.
+
 ### Editing a Livewire component shifts the line-keyed PHPStan baseline
 Any edit inside `resources/views/livewire/tickets/⚡*.blade.php` moves line
 numbers, so `phpstan-baseline.neon` entries stop matching and `composer phpstan`
@@ -99,6 +163,12 @@ composer phpstan-baseline && composer phpstan   # must print "[OK] No errors"
 Do not hand-edit the baseline, and do not assume every reported error is real —
 separate your own from the line-shift noise first (`git stash` + rerun gives the
 true pre-existing count).
+
+To prove the regeneration added **nothing**, diff the baseline's `message:` lines
+as a multiset before/after and normalise the anon-component line key
+(`…blade\.php\:\d+\:\:` → `…blade\.php\:\:\:`). The count must be identical and
+`Counter(new) - Counter(old)` must be empty — a plain `git diff` looks like 21
+additions even though every one is just `:4::` → `:7::`.
 
 ## 8. Superpowers skills are mandatory
 `superpowers` plugin installed at `~/.hermes/plugins/superpowers` (v6.4.2, 15 skills,
