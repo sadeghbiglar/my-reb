@@ -8,9 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 340
     env:
-      REPO_ORIGIN: https://github.com/Shabakebehdasht/h-dashboard.git
+      REPO_ORIGIN: https://github.com/sadeghbiglar/h-dashboard.git
       WF_NAME: rebecca
 
     steps:
@@ -125,8 +125,8 @@ jobs:
           cd h-dashboard
 
           # Set git identity for commits
-          git config user.name "Shabakebehdasht/"
-          git config user.email "Shabakebehdasht/@users.noreply.github.com"
+          git config user.name "sadeghbiglar/"
+          git config user.email "sadeghbiglar/@users.noreply.github.com"
 
           # Fetch latest origin/beta
           git fetch origin beta
@@ -350,11 +350,11 @@ jobs:
           nohup php artisan serve --host=0.0.0.0 > /dev/null 2>&1 &
           echo '✅ Laravel server started on port 8000'
 
-      - name: 15. Server Keep-Alive (300m)
+      - name: 15. Server Keep-Alive (340m)
         run: |
-          for i in {1..300}; do
+          for i in {1..340}; do
             sleep 60
-            echo "[$i/300] Server is active (SSH + Laravel on port 8000)..."
+            echo "[$i/340] Server is active (SSH + Laravel on port 8000)..."
           done
 
       - name: 16. Sync hermes state & 9router data back to my-reb
@@ -363,10 +363,10 @@ jobs:
           GH_TOKEN: ${{ secrets.MY_PAT }}
         run: |
           cd "${GITHUB_WORKSPACE:-.}"
-          git config user.name "Shabakebehdasht/"
-          git config user.email "Shabakebehdasht/@users.noreply.github.com"
+          git config user.name "sadeghbiglar/"
+          git config user.email "sadeghbiglar/@users.noreply.github.com"
           # Authenticate with PAT for push
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/Shabakebehdasht/my-reb.git"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/sadeghbiglar/my-reb.git"
 
           H=/home/runner/.hermes
           HDEST=hermes
