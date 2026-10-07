@@ -76,6 +76,17 @@ hermes config set auxiliary.vision.provider <your_provider>
 hermes config set auxiliary.vision.model <model_name>
 ```
 
-### "Reset permissions" / auto-approving everything
+### "custom rejected your API key" / HTTP 401 Invalid API key
+The active Hermes session cannot authenticate against its configured `model.base_url`. GitHub Actions secrets do NOT affect this — the key lives in the Hermes runtime's own env.
+
+1. Identify which machine runs the broken session: `hostname`, `HERMES_SESSION_CHAT_NAME` env var.
+2. Verify the key env var matches: `grep HERMES_CUSTOM ~/.hermes/.env` and check `key_env` in `~/.hermes/config.yaml`.
+3. Test the endpoint directly:
+```bash
+KEY=$(grep HERMES_CUSTOM ~/.hermes/.env | cut -d= -f2)
+curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $KEY" http://<base_url>/v1/models
+```
+   200 = key is valid (error is elsewhere); 401 = key in `.env` doesn't match what the local server expects. Fix: update `.env` with the correct key and restart the gateway.
+4. If the server binds to a specific interface, check it accepts connections from the machine running Hermes (Tailscale IPs, etc.).
 See `references/security-privacy.md` — wipe the "Always allow" stores, don't touch yolo mode.
 
