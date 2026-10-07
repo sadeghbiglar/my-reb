@@ -8,7 +8,7 @@ The main project is:
 
 Canonical upstream repository:
 
-`https://github.com/asgarimehdi/h-dashboard`
+`https://github.com/sadeghbiglar/h-dashboard`
 
 Each server has its own fork/repository and its own dedicated working branch.
 
@@ -101,7 +101,7 @@ create a Pull Request from the current server-specific branch to:
 
 of the canonical repository:
 
-`https://github.com/asgarimehdi/h-dashboard`
+`https://github.com/sadeghbiglar/h-dashboard`
 
 Use GitHub MCP when available.
 
