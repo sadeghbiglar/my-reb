@@ -1,4 +1,13 @@
 {
-  "updated_at": "2026-10-08T14:43:50.868778",
-  "platforms": {}
+  "updated_at": "2026-10-08T20:49:15.244265",
+  "platforms": {
+    "telegram": [
+      {
+        "id": "6736779443",
+        "name": "Sadegh Biglar",
+        "type": "dm",
+        "thread_id": null
+      }
+    ]
+  }
 }

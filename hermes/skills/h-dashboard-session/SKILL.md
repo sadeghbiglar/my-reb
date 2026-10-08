@@ -17,8 +17,10 @@ Any session touching `/home/runner/h-dashboard`: new feature, bug fix, refactor,
 or a plain structural question about the code. Run sections 1-5 before real work.
 
 Repo: `/home/runner/h-dashboard` (also the configured Hermes `terminal.cwd`).
-Branch: `rebecca`. Canonical upstream: `asgarimehdi/h-dashboard`, branch `beta`.
-Only remote is `origin` (this server's fork); **never add, rename, or delete remotes.**
+Branch: read with `git branch --show-current` (this server: `rebecca`). Canonical repo:
+`sadeghbiglar/h-dashboard`, branch `beta`.
+Only remote is `origin`; **never add, rename, or delete remotes.** Confirm what `origin`
+points at with `git remote -v` every session — do not hardcode a fork URL.
 
 ## 1. Never
 - Do not clone a second copy of the repo.
@@ -68,7 +70,7 @@ Clear commit message, then `git push origin <current-branch>`.
 
 ## 7. Pull requests
 When the user says `pr`, open a PR from the current branch to `beta` of
-`https://github.com/asgarimehdi/h-dashboard`. **Do not merge** unless asked.
+`https://github.com/sadeghbiglar/h-dashboard`. **Do not merge** unless asked.
 
 Two tooling pitfalls, both verified 2026-10-06 (issue #818 / PR #822):
 
@@ -77,15 +79,15 @@ Two tooling pitfalls, both verified 2026-10-06 (issue #818 / PR #822):
   "missing required argument(s): base" no matter how the payload is built, and
   the body never reaches the server. `gh` works:
   ```bash
-  gh pr create --repo asgarimehdi/h-dashboard --base beta \
-    --head Shabakebehdasht:rebecca --title "..." --body-file /tmp/pr.md
+  gh pr create --repo sadeghbiglar/h-dashboard --base beta \
+    --head <current-branch> --title "..." --body-file /tmp/pr.md
   ```
   Write a long body to a scratch file and pass `--body-file`; inline
   `--body` mangles backticks and newlines.
 - **No `--maintainer-can-modify` flag** on this machine's `gh` — it errors and
   prints usage. Omit it; the fork relationship already allows maintainer edits.
-- Watch CI with `gh run watch <run-id> --repo asgarimehdi/h-dashboard --exit-status`
-  (run id from `gh pr checks <pr> --repo asgarimehdi/h-dashboard`). `--repo` is
+- Watch CI with `gh run watch <run-id> --repo sadeghbiglar/h-dashboard --exit-status`
+  (run id from `gh pr checks <pr> --repo sadeghbiglar/h-dashboard`). `--repo` is
   required — without it the run id does not resolve from this fork's context.
 
 ### A Sanctum ability assertion is worthless unless the session is detached
@@ -170,7 +172,53 @@ as a multiset before/after and normalise the anon-component line key
 `Counter(new) - Counter(old)` must be empty — a plain `git diff` looks like 21
 additions even though every one is just `:4::` → `:7::`.
 
-## 8. Superpowers skills are mandatory
+## 8. Reporting completed work / push location
+When the user asks "what did you do" or "where did you push", answer from git,
+never from memory or commit messages alone:
+```bash
+git branch --show-current
+git remote -v
+git log --oneline -N
+git log --oneline origin/<branch>   # what is actually on the remote
+git branch -r --contains <sha>      # which remote branches contain a commit
+git reflog | head                   # what happened THIS session (clone/checkout/push)
+```
+- A fresh clone makes reflog start at the clone, so commits already on
+  `origin/<branch>` predate the session — do not claim them as this session's work,
+  and do not treat them as uncommitted.
+- Memory entries naming fixes/perf work may refer to other branches or servers —
+  verify existence with `git log --all --grep=<term>` before citing.
+- Answer "where pushed" with remote name, full URL, branch, and the short SHAs.
+- Format the work summary for the user's preference: terse Persian, ticket-style
+  bullets — عنوان تیکت / تغییرات (sha) / علت. No narrative, no filler, no tables.
+
+## 9. Admin / access grants are unit-scope work, not role work
+`admin` role grants no unit scope: `accessibleUnitIds()` reads
+`session('current_unit_id')` → `user_units` pivot → `person.u_id`, then
+`Unit::descendantIds()`. "Full admin" therefore means a pivot row on the ROOT
+unit. The national code is `persons.n_code` (there is no `melli_number`
+column), and `user` is linked to `person` by `n_code`, not by id.
+Adding a second `user_units` row makes `ValidateUnitContext` redirect to
+`/select-context` on every request — warn about that trade-off and let the user
+choose. Full procedure, verification, and cache-invalidation commands:
+`references/user-access-grants.md`.
+
+### Eligibility, not access, is what usually bounds a picker
+Widening the pivot does **not** change which options a dropdown offers. Many
+pickers filter on capability flags plus `is_active` and carry no scope predicate
+at all, so "I gave the account full scope and the list is still short" is
+answered by reading the picker's own query, not by granting more units.
+
+**Rule:** compute and report three counts separately — eligible (flags), in-scope
+(`accessibleUnitIds()`), accepted (validation rule). A short list is almost
+always the flag column, and the pivot change was irrelevant to it. Say so
+explicitly rather than letting the grant imply it widened the picker.
+
+## References
+- `references/user-access-grants.md` — role/pivot grants, cache invalidation, verification.
+- `references/page-audit-checklist.md` — standing checklist for reviewing a page/component for scope, auth, parity and dead-capability gaps.
+
+## 10. Superpowers skills are mandatory
 `superpowers` plugin installed at `~/.hermes/plugins/superpowers` (v6.4.2, 15 skills,
 source `obra/superpowers`, installed with `--force` after manual entrypoint review on
 2026-10-05). Load the process skill before acting:
@@ -183,7 +231,7 @@ The `using-superpowers` bootstrap is injected only on the **first turn** of a se
 lost it — that is the known failure mode, not a broken install. `AGENTS.md` above
 repeats the load-bearing rules so they survive compaction.
 
-## 9. Docs and audit skills
+## 11. Docs and audit skills
 - `read-the-damn-docs` (software-development/read-the-damn-docs) — read official/current
   docs before implementing against any third-party API or library. Context7 MCP for
   version-specific Laravel/PHP docs.

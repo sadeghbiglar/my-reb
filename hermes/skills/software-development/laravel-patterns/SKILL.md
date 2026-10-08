@@ -245,6 +245,50 @@ all of them or write down in the abstraction's docblock why the converted call s
 complete set. A job whose failure is routed through the queue's failure handler is a
 legitimate reason to stay unconverted; an unexamined third caller is not.
 
+## Uploads & File Egress
+
+### `store(..., 'public')` + an `asset()` link is an unauthenticated read
+Uploads written to the `public` disk and rendered as `asset('storage/'.$path)` are
+served by the web server straight off disk. No route, no middleware, no ownership
+check, no tenant check — anyone holding the URL downloads it, forever, including
+after the parent record is deleted.
+
+**Rule:** treat the *serving* side of every upload as its own authorization surface.
+Grep the read side for the asset link, then ask which code runs when that URL is
+requested. If the answer is "the web server", the download is public and the upload
+is a data-exfiltration primitive no amount of `mimes:` validation addresses. The
+correct shape is a controller action that authorizes the parent record's scope,
+checks ownership/visibility, and streams via `Storage::download()`. Confirm the
+storage symlink the asset URL depends on actually exists — its absence means the
+link 404s, which is a *separate* finding (dead feature) and does not make the
+underlying exposure safe on any deployment that does have it.
+
+Check the attachment table's row count before estimating blast radius, but do not
+read an empty table as "no risk" — it only means nobody has exercised it yet.
+
+### Normalize every searchable text, or the search silently misses
+A project with a text-normalizing trait (Arabic/Persian character folding, ZWNJ,
+digit folding) hooked into some models' `saving` event will produce **falsely empty
+results** for any search over a model that does not use the trait, and for any
+search whose term side omits the helper. Arabic `ي`/`ك` vs Persian `ی`/`ک`, and ZWNJ
+vs space, are the common triggers.
+
+**Rule:** when adding a `LIKE`/full-text search, apply the same normalizer to the
+term that the save path applies to the column, and grep for models that store text
+without the hook. Report it as concrete input ("typed ك, stored ك") — a vague
+"search may be unreliable" reads as speculation and gets deprioritized.
+
+### A column that no form writes is a dead capability, not a cosmetic gap
+A field present in the DB, accepted by the API, and read by dashboards/reports, but
+absent from every create/edit form, computes a constant forever — every report built
+on it returns the same fixed value, which reads as "nothing is overdue" rather than
+as a bug.
+
+**Rule:** for each domain column, grep consumers and compare against the form's field
+list. When the column is unwritten, name the specific consumer that is currently
+guaranteed to be constant, and rank the finding above cosmetic gaps — a reader can
+act on it immediately.
+
 ## Operational Data
 
 ### An append-only table written by a high-frequency job needs a retention owner
