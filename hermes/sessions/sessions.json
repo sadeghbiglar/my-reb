@@ -144,9 +144,9 @@
   },
   "agent:main:telegram:dm:6736779443": {
     "session_key": "agent:main:telegram:dm:6736779443",
-    "session_id": "20261008_151621_c9fb28f6",
-    "created_at": "2026-10-08T15:16:21.142036",
-    "updated_at": "2026-10-08T15:16:21.142036",
+    "session_id": "20261009_011600_0bd3a06c",
+    "created_at": "2026-10-09T01:16:00.540429",
+    "updated_at": "2026-10-09T01:16:00.540429",
     "display_name": "Sadegh Biglar",
     "platform": "telegram",
     "chat_type": "dm",
@@ -181,7 +181,7 @@
       "user_name": "Sadegh Biglar",
       "thread_id": null,
       "chat_topic": null,
-      "message_id": "138"
+      "message_id": "180"
     }
   }
 }
